@@ -206,9 +206,6 @@ pub struct InesHeader {
     /// Submapper number (NES 2.0 only)
     pub submapper: u8,
 
-    /// Whether the image contains a 512-byte trainer
-    pub has_trainer: bool,
-
     /// PRG RAM size in bytes (interpreted according to format)
     pub prg_ram_size: RamSize,
 
@@ -316,7 +313,6 @@ impl InesHeader {
                 chr_rom_size,
                 mapper,
                 submapper: flags_8.submapper(),
-                has_trainer: flags_6.trainer(),
                 prg_ram_size: RamSize::Nes2 { ram: prg_ram_size, nvram: prg_nvram_size },
                 chr_ram_size: RamSize::Nes2 { ram: chr_ram_size, nvram: chr_nvram_size },
                 flags_6,
@@ -368,7 +364,6 @@ impl InesHeader {
                 chr_rom_size,
                 mapper,
                 submapper: 0, // No submapper in iNES format
-                has_trainer: flags_6.trainer(),
                 prg_ram_size: RamSize::Ines(prg_ram_size),
                 chr_ram_size: RamSize::Ines(chr_ram_size),
                 flags_6,
