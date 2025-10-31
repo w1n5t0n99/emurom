@@ -47,8 +47,7 @@ impl TimingMode {
         self as _
     }
     const fn from_bits(value: u8) -> Self {
-        let value = value & 0b11;
-        match value {
+        match value & 0b11 {
             0 => Self::NTSC,
             1 => Self::PAL,
             2 => Self::MultipleRegions,
@@ -56,6 +55,48 @@ impl TimingMode {
             _ => unreachable!(),
         }
     }
+}
+
+// Backward compatible with iNes which uses D0 as Vs. System and D1 as PlayChoice-10
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ConsoleType {
+    NES = 0,
+    VsSystem = 1,
+    PlayChoice10 = 2,
+    ExtendedConsole = 3,
+}
+
+impl ConsoleType {
+    // This has to be a const fn
+    const fn into_bits(self) -> u8 {
+        self as _
+    }
+    const fn from_bits(value: u8) -> Self {
+        match value & 0b11 {
+            0 => Self::NES,
+            1 => Self::VsSystem,
+            2 => Self::PlayChoice10,
+            3 => Self::ExtendedConsole,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[bitfield(u8)]
+pub struct VsSystemType {
+    #[bits(4)]
+    pub ppu_type: u8,    // bits 0-3
+    #[bits(4)]
+    pub hardware_type: u8, // bits 4-7
+}
+
+#[bitfield(u8)]
+pub struct ExtendedConsoleType {
+    #[bits(4)]
+    pub extended_console_type: u8,    // bits 0-3
+    #[bits(4)]
+    __: u8, // bits 4-7
 }
 
 #[bitfield(u8)]
@@ -70,8 +111,8 @@ pub struct Flags6 {
 
 #[bitfield(u8)]
 pub struct Flags7 {
-    pub vs_unisystem: bool,   // bit 0
-    pub playchoice_10: bool,  // bit 1
+    #[bits(2)]
+    pub console: ConsoleType,   // bit 0-1
     #[bits(2)]
     pub format: u8,           // bits 2-3 (should be 2 for NES 2.0)
     #[bits(4)]
@@ -118,6 +159,36 @@ pub struct Flags12Nes2 {
     __: u8,       // bits 2-7
 }
 
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum Flags13Nes2 {
+    vs_system(VsSystemType),
+    extended_console(ExtendedConsoleType),
+    unusedForConsoleType(u8),
+}
+impl Flags13Nes2 {
+    // This has to be a const fn
+    const fn into_bits(self) -> u8 {
+        match self {
+            Flags13Nes2::vs_system(vs) => vs.into_bits(),
+            Flags13Nes2::extended_console(ec) => ec.into_bits(),
+            Flags13Nes2::unusedForConsoleType(value) => value,
+        }
+    }
+
+    fn from_bits(value: u8, flags7: Flags7) -> Self {
+        // When Byte 7 AND 3 =1: Vs. System Type
+        if flags7.console() == ConsoleType::VsSystem {
+            Flags13Nes2::vs_system(VsSystemType::from_bits(value))
+        // When Byte 7 AND 3 =3: Extended Console Type
+        } else if flags7.console() == ConsoleType::ExtendedConsole {
+            Flags13Nes2::extended_console(ExtendedConsoleType::from_bits(value))
+        } else {
+            Flags13Nes2::unusedForConsoleType(value)
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct InesHeader {
     /// Which header format this is (iNES v1 or NES 2.0)
@@ -156,6 +227,8 @@ pub struct InesHeader {
     pub flags_11: Flags11Nes2,
     /// Parsed flags from byte 12 (NES 2.0 specific)
     pub flags_12: Flags12Nes2,
+    /// Parsed flags from byte 13 (NES 2.0 specific)
+    pub flags_13: Flags13Nes2,
 }
 
 impl InesHeader {
@@ -173,42 +246,21 @@ impl InesHeader {
         }
 
         // Parse flags 6 (mapper low nibble and mirroring)
-        let flags_6 = Flags6::new()
-            .with_nametable((bytes[6] & 0x01) != 0)
-            .with_battery_backed((bytes[6] & 0x02) != 0)
-            .with_trainer((bytes[6] & 0x04) != 0)
-            .with_alternative_nametable((bytes[6] & 0x08) != 0)
-            .with_mapper_low((bytes[6] >> 4) & 0x0F);
-
+        let flags_6 = Flags6::from_bits(bytes[6]);
         // Parse flags 7 (mapper high nibble and format)
-        let flags_7 = Flags7::new()
-            .with_vs_unisystem((bytes[7] & 0x01) != 0)
-            .with_playchoice_10((bytes[7] & 0x02) != 0)
-            .with_format((bytes[7] >> 2) & 0x03)
-            .with_mapper_high((bytes[7] >> 4) & 0x0F);
-
+        let flags_7 = Flags7::from_bits(bytes[7]);
         // Parse flags 8 (NES 2.0 mapper/submapper)
-        let flags_8 = Flags8Nes2::new()
-            .with_submapper(bytes[8] & 0x0F)
-            .with_mapper_high2((bytes[8] >> 4) & 0x0F);
-
+        let flags_8 = Flags8Nes2::from_bits(bytes[8]);
         // Parse flags 9 (NES 2.0 extended ROM size MSBs)
-        let flags_9 = Flags9Nes2::new()
-            .with_prg_rom_msb(bytes[9] & 0x0F)
-            .with_chr_rom_msb((bytes[9] >> 4) & 0x0F);
-
+        let flags_9 = Flags9Nes2::from_bits(bytes[9]);
         // Parse flags 10 (NES 2.0 RAM size shift counts)
-        let flags_10 = Flags10Nes2::new()
-            .with_prg_ram_shift(bytes[10] & 0x0F)
-            .with_prg_nvram_shift((bytes[10] >> 4) & 0x0F);
-
+        let flags_10 = Flags10Nes2::from_bits(bytes[10]);
         // Parse flags 11 (NES 2.0 RAM size shift counts)
-        let flags_11 = Flags11Nes2::new()
-            .with_chr_ram_shift(bytes[11] & 0x0F)
-            .with_chr_nvram_shift((bytes[11] >> 4) & 0x0F);
-
+        let flags_11 = Flags11Nes2::from_bits(bytes[11]);
         // Parse flags 12 (NES 2.0 timing mode)
         let flags_12 = Flags12Nes2::from_bits(bytes[12]);
+        // Parse flags 13 (NES 2.0 console type)
+        let flags_13 = Flags13Nes2::from_bits(bytes[13], flags_7);
 
         // Detect NES 2.0: bits 2-3 of byte 7 equal 2 (binary 10)
         let is_nes2 = flags_7.format() == 2;
@@ -273,6 +325,7 @@ impl InesHeader {
                 flags_10,
                 flags_11,
                 flags_12,
+                flags_13,
             })
         } else {
             // iNES format: simpler mapper and RAM size handling
@@ -283,7 +336,7 @@ impl InesHeader {
             // an emulator should either mask off the upper 4 bits of the mapper number or simply refuse to load the ROM
             let diskdude_signature = &bytes[12..16];
             let mapper = if diskdude_signature != [0, 0, 0, 0] {
-                (flags_6.mapper_low() as u16)
+                flags_6.mapper_low() as u16
             } else {
                 ((flags_7.mapper_high() as u16) << 4) | (flags_6.mapper_low() as u16)
             };
@@ -324,6 +377,7 @@ impl InesHeader {
                 flags_10,
                 flags_11,
                 flags_12,
+                flags_13,
             })
         }
     }

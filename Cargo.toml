@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 bitfield-struct = "0.12.1"
+thiserror = "2"
