@@ -1,23 +1,10 @@
 use std::path::Path;
 use std::fs::File;
-use std::io::{self, BufReader, Read};
+use std::io::{self, BufReader, Read, Seek};
 
-use thiserror::Error;
-
+use crate::nes::error::RomParseError;
 use crate::nes::header::InesHeader;
 
-
-#[derive(Error, Debug)]
-pub enum RomParseError {
-    #[error("header too short")]
-    HeaderTooShort,
-    #[error("invalid NES header magic")]
-    HeaderInvalidMagic,
-    #[error("invalid ROM size, inconsistent with header")]
-    InvalidRomSize,
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
-}
 
 pub struct Cartridge {
     pub ines_header: InesHeader,
@@ -30,12 +17,15 @@ pub struct Cartridge {
 
 impl Cartridge {
     pub fn load_rom_file(path: impl AsRef<Path>) -> Result<Self, RomParseError> {
+        let bytes = std::fs::read(path)?;
+        let header = InesHeader::from_bytes(&bytes)?;
 
+        
         
         todo!()
     }
 
-    pub fn load_rom_data<R: Read>(data: &mut R) -> Result<Self, RomParseError> {
+    pub fn load_rom_data<R: Read + Seek>(data: &mut R) -> Result<Self, RomParseError> {
 
         
         todo!()

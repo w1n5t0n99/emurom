@@ -1,7 +1,9 @@
 use bitfield_struct::bitfield;
-use std::fmt;
+
+use crate::nes::error::RomParseError;
 
 const NES_MAGIC: &[u8; 4] = b"NES\x1A";
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeaderFormat {
@@ -9,22 +11,6 @@ pub enum HeaderFormat {
     Nes2,  // NES 2.0
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum HeaderParseError {
-    TooShort,
-    InvalidMagic,
-}
-
-impl fmt::Display for HeaderParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            HeaderParseError::TooShort => write!(f, "header too short"),
-            HeaderParseError::InvalidMagic => write!(f, "invalid NES header magic"),
-        }
-    }
-}
-
-impl std::error::Error for HeaderParseError {}
 
 #[derive(Debug, Clone, Copy)]
 pub enum RamSize {
@@ -233,13 +219,13 @@ impl InesHeader {
     ///
     /// This will detect NES 2.0 via the magic bits in header[7] and populate the
     /// extended PRG/CHR sizes when present.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, HeaderParseError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, RomParseError> {
         if bytes.len() < 16 {
-            return Err(HeaderParseError::TooShort);
+            return Err(RomParseError::HeaderTooShort);
         }
 
         if &bytes[0..4] != NES_MAGIC {
-            return Err(HeaderParseError::InvalidMagic);
+            return Err(RomParseError::HeaderInvalidMagic);
         }
 
         // Parse flags 6 (mapper low nibble and mirroring)
