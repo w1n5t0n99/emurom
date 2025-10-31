@@ -162,29 +162,29 @@ pub struct Flags12Nes2 {
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum Flags13Nes2 {
-    vs_system(VsSystemType),
-    extended_console(ExtendedConsoleType),
-    unusedForConsoleType(u8),
+    VsSystem(VsSystemType),
+    ExtendedConsole(ExtendedConsoleType),
+    UnusedForConsoleType(u8),
 }
 impl Flags13Nes2 {
     // This has to be a const fn
     const fn into_bits(self) -> u8 {
         match self {
-            Flags13Nes2::vs_system(vs) => vs.into_bits(),
-            Flags13Nes2::extended_console(ec) => ec.into_bits(),
-            Flags13Nes2::unusedForConsoleType(value) => value,
+            Flags13Nes2::VsSystem(vs) => vs.into_bits(),
+            Flags13Nes2::ExtendedConsole(ec) => ec.into_bits(),
+            Flags13Nes2::UnusedForConsoleType(value) => value,
         }
     }
 
     fn from_bits(value: u8, flags7: Flags7) -> Self {
         // When Byte 7 AND 3 =1: Vs. System Type
         if flags7.console() == ConsoleType::VsSystem {
-            Flags13Nes2::vs_system(VsSystemType::from_bits(value))
+            Flags13Nes2::VsSystem(VsSystemType::from_bits(value))
         // When Byte 7 AND 3 =3: Extended Console Type
         } else if flags7.console() == ConsoleType::ExtendedConsole {
-            Flags13Nes2::extended_console(ExtendedConsoleType::from_bits(value))
+            Flags13Nes2::ExtendedConsole(ExtendedConsoleType::from_bits(value))
         } else {
-            Flags13Nes2::unusedForConsoleType(value)
+            Flags13Nes2::UnusedForConsoleType(value)
         }
     }
 }
