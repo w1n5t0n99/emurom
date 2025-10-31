@@ -32,6 +32,32 @@ pub enum RamSize {
     Nes2{ram: u32, nvram: u32},
 }
 
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum TimingMode {
+    NTSC = 0,
+    PAL = 1,
+    MultipleRegions = 2,
+    Dendy = 3,
+}
+
+impl TimingMode {
+    // This has to be a const fn
+    const fn into_bits(self) -> u8 {
+        self as _
+    }
+    const fn from_bits(value: u8) -> Self {
+        let value = value & 0b11;
+        match value {
+            0 => Self::NTSC,
+            1 => Self::PAL,
+            2 => Self::MultipleRegions,
+            3 => Self::Dendy,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[bitfield(u8)]
 pub struct Flags6 {
     pub nametable: bool,      // bit 0
@@ -84,6 +110,14 @@ pub struct Flags11Nes2 {
     pub chr_nvram_shift: u8,  // bits 4-7
 }
 
+#[bitfield(u8)]
+pub struct Flags12Nes2 {
+    #[bits(2)]
+    pub timing_mode: TimingMode,    // bits 0-1
+    #[bits(6)]
+    __: u8,       // bits 2-7
+}
+
 #[derive(Debug, Clone)]
 pub struct InesHeader {
     /// Which header format this is (iNES v1 or NES 2.0)
@@ -120,6 +154,8 @@ pub struct InesHeader {
     pub flags_10: Flags10Nes2,
     /// Parsed flags from byte 11 (NES 2.0 specific)
     pub flags_11: Flags11Nes2,
+    /// Parsed flags from byte 12 (NES 2.0 specific)
+    pub flags_12: Flags12Nes2,
 }
 
 impl InesHeader {
@@ -170,6 +206,9 @@ impl InesHeader {
         let flags_11 = Flags11Nes2::new()
             .with_chr_ram_shift(bytes[11] & 0x0F)
             .with_chr_nvram_shift((bytes[11] >> 4) & 0x0F);
+
+        // Parse flags 12 (NES 2.0 timing mode)
+        let flags_12 = Flags12Nes2::from_bits(bytes[12]);
 
         // Detect NES 2.0: bits 2-3 of byte 7 equal 2 (binary 10)
         let is_nes2 = flags_7.format() == 2;
@@ -233,6 +272,7 @@ impl InesHeader {
                 flags_9,
                 flags_10,
                 flags_11,
+                flags_12,
             })
         } else {
             // iNES format: simpler mapper and RAM size handling
@@ -283,6 +323,7 @@ impl InesHeader {
                 flags_9,
                 flags_10,
                 flags_11,
+                flags_12,
             })
         }
     }
