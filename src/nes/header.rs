@@ -149,8 +149,8 @@ pub struct Flags12Nes2 {
 #[repr(u8)]
 pub enum Flags13Nes2 {
     VsSystem(VsSystemType),
-    ExtendedConsole(ExtendedConsoleType),
-    UnusedForConsoleType(u8),
+    ExtendedConsoleType(ExtendedConsoleType),
+    Unused(u8),  // flag 7 set for other console types (playchoice-10, etc.)
 }
 
 impl Flags13Nes2 {
@@ -158,8 +158,8 @@ impl Flags13Nes2 {
     const fn into_bits(self) -> u8 {
         match self {
             Flags13Nes2::VsSystem(vs) => vs.into_bits(),
-            Flags13Nes2::ExtendedConsole(ec) => ec.into_bits(),
-            Flags13Nes2::UnusedForConsoleType(value) => value,
+            Flags13Nes2::ExtendedConsoleType(ec) => ec.into_bits(),
+            Flags13Nes2::Unused(value) => value, 
         }
     }
 
@@ -169,9 +169,9 @@ impl Flags13Nes2 {
             Flags13Nes2::VsSystem(VsSystemType::from_bits(value))
         // When Byte 7 AND 3 =3: Extended Console Type
         } else if flags7.console() == ConsoleType::ExtendedConsole {
-            Flags13Nes2::ExtendedConsole(ExtendedConsoleType::from_bits(value))
+            Flags13Nes2::ExtendedConsoleType(ExtendedConsoleType::from_bits(value))
         } else {
-            Flags13Nes2::UnusedForConsoleType(value)
+            Flags13Nes2::Unused(value)
         }
     }
 }
