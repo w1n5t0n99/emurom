@@ -12,7 +12,7 @@ pub enum HeaderFormat {
 }
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RamSize {
     Ines(u32),
     Nes2{ram: u32, nvram: u32},
@@ -87,7 +87,7 @@ pub struct ExtendedConsoleType {
 
 #[bitfield(u8)]
 pub struct Flags6 {
-    pub nametable: bool,      // bit 0
+    pub nametable: bool,      // bit 0 (0 = horizontal, 1 = vertical)
     pub battery_backed: bool,  // bit 1
     pub trainer: bool,        // bit 2
     pub alternative_nametable: bool,    // bit 3
@@ -116,9 +116,9 @@ pub struct Flags9Nes2 {
 #[bitfield(u8)]
 pub struct Flags8Nes2 {
     #[bits(4)]
-    pub submapper: u8,        // bits 0-3
+    pub mapper_high2: u8,     // bits 0-3 (mapper bits 12-15)
     #[bits(4)]
-    pub mapper_high2: u8,     // bits 4-7 (mapper bits 12-15)
+    pub submapper: u8,        // bits 4-7
 }
 
 #[bitfield(u8)]
@@ -152,6 +152,7 @@ pub enum Flags13Nes2 {
     ExtendedConsole(ExtendedConsoleType),
     UnusedForConsoleType(u8),
 }
+
 impl Flags13Nes2 {
     // This has to be a const fn
     const fn into_bits(self) -> u8 {
@@ -262,9 +263,9 @@ impl InesHeader {
             let chr_rom_size = chr_chunks * 8 * 1024;
 
             // NES 2.0 mapper combines bits from flags 6, 7, and 8
-            let mapper = ((flags_8.mapper_high2() as u16) << 12) |
-                     ((flags_7.mapper_high() as u16) << 8) |
-                     ((flags_6.mapper_low() as u16) << 4);
+            let mapper = ((flags_8.mapper_high2() as u16) << 8) |
+                     ((flags_7.mapper_high() as u16) << 4) |
+                     (flags_6.mapper_low() as u16);
 
             // Calculate PRG RAM size using shift count from flags 10
             // Size = 64 << shift count (in bytes), or 0 if shift count is 0
@@ -320,7 +321,7 @@ impl InesHeader {
             let mapper = if diskdude_signature != [0, 0, 0, 0] {
                 flags_6.mapper_low() as u16
             } else {
-                ((flags_7.mapper_high() as u16) << 4) | (flags_6.mapper_low() as u16)
+                ((flags_7.mapper_high() as u16) >> 4) | (flags_6.mapper_low() as u16)
             };
 
             // Convert chunks to bytes:
@@ -337,7 +338,7 @@ impl InesHeader {
             };
 
             // In iNES format, if chr_rom_size is 0, we assume 8KB of CHR RAM as default 
-            // the mapper will determine the CHR RAM size
+            // the mapper may determine the CHR RAM size
             let chr_ram_size = if bytes[5] == 0 {
                 8 * 1024  // Default to 8KB if unspecified
             } else {
