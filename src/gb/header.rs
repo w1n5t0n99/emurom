@@ -1,5 +1,7 @@
 use bitfield_struct::bitfield;
-use std::fmt;
+
+use crate::gb::error::RomParseError;
+
 
 /// Entry point and Nintendo logo from 0x104-0x133
 const GB_LOGO: &[u8; 48] = &[
@@ -15,6 +17,7 @@ pub enum HeaderFormat {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum CartridgeType {
     RomOnly = 0x00,
     MBC1 = 0x01,
@@ -47,7 +50,11 @@ pub enum CartridgeType {
 }
 
 impl CartridgeType {
-    pub fn from_byte(value: u8) -> Option<Self> {
+    pub fn into_bits(self) -> u8 {
+        self as _
+    }
+
+    pub fn from_bits(value: u8) -> Option<Self> {
         use CartridgeType::*;
         match value {
             0x00 => Some(RomOnly),
@@ -82,29 +89,6 @@ impl CartridgeType {
         }
     }
 }
-
-#[derive(Debug)]
-pub enum HeaderParseError {
-    TooShort,
-    InvalidLogo,
-    InvalidCartridgeType,
-    InvalidHeaderChecksum,
-    InvalidGlobalChecksum,
-}
-
-impl fmt::Display for HeaderParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            HeaderParseError::TooShort => write!(f, "ROM data too short"),
-            HeaderParseError::InvalidLogo => write!(f, "invalid Nintendo logo"),
-            HeaderParseError::InvalidCartridgeType => write!(f, "invalid cartridge type"),
-            HeaderParseError::InvalidHeaderChecksum => write!(f, "invalid header checksum"),
-            HeaderParseError::InvalidGlobalChecksum => write!(f, "invalid global checksum"),
-        }
-    }
-}
-
-impl std::error::Error for HeaderParseError {}
 
 #[bitfield(u8)]
 pub struct GbcFlags {
@@ -170,14 +154,14 @@ pub struct GbHeader {
 
 impl GbHeader {
     /// Parse a Game Boy ROM header from bytes
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, HeaderParseError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, RomParseError> {
         if bytes.len() < 0x150 {
-            return Err(HeaderParseError::TooShort);
+            return Err(RomParseError::HeaderTooShort);
         }
 
         // Verify Nintendo logo
         if &bytes[0x104..0x134] != GB_LOGO {
-            return Err(HeaderParseError::InvalidLogo);
+            return Err(RomParseError::InvalidLogo);
         }
 
         // Parse title and manufacturer code
@@ -212,8 +196,8 @@ impl GbHeader {
         let sgb_flags = SgbFlags::from_bits(bytes[0x146]);
 
         // Parse cartridge type
-        let cart_type = CartridgeType::from_byte(bytes[0x147])
-            .ok_or(HeaderParseError::InvalidCartridgeType)?;
+        let cart_type = CartridgeType::from_bits(bytes[0x147])
+            .ok_or(RomParseError::InvalidCartridgeType)?;
 
         // Calculate ROM size (32KB << shift)
         let rom_shift = bytes[0x148];
@@ -236,7 +220,7 @@ impl GbHeader {
             checksum = checksum.wrapping_sub(byte).wrapping_sub(1);
         }
         if checksum != bytes[0x14D] {
-            return Err(HeaderParseError::InvalidHeaderChecksum);
+            return Err(RomParseError::InvalidHeaderChecksum);
         }
 
         // Parse global checksum (verify only if requested)

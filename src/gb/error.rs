@@ -11,8 +11,8 @@ pub enum RomParseError {
     InvalidCartridgeType,
     #[error("invalid header checksum")]
     InvalidHeaderChecksum,
-    #[error("invalid global checksum")]
-    InvalidGlobalChecksum,
+    #[error("invalid ROM size")]
+    InvalidRomSize,
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 }

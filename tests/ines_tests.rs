@@ -1,8 +1,5 @@
 use std::path::PathBuf;
 
-use emurom::nes::cartridge;
-
-
 
 fn get_file_path(file_name: &str) -> String {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -13,7 +10,7 @@ fn get_file_path(file_name: &str) -> String {
 
 #[test]
 fn test_ines_rom_header() {
-    let rom_path = get_file_path("nestest.nes");
+    let rom_path = get_file_path("nes_nestest.nes");
     let cartridge = emurom::nes::cartridge::Cartridge::load_rom_file(&rom_path);
 
     assert!(cartridge.is_ok());
@@ -31,7 +28,7 @@ fn test_ines_rom_header() {
 
 #[test]
 fn test_nes2_rom_header() {
-    let rom_path = get_file_path("mmc3bigchrram.nes");
+    let rom_path = get_file_path("nes_mmc3bigchrram.nes");
     let cartridge = emurom::nes::cartridge::Cartridge::load_rom_file(&rom_path);
 
     assert!(cartridge.is_ok());
@@ -49,7 +46,7 @@ fn test_nes2_rom_header() {
     assert_eq!(header.submapper, 0, "Submapper mismatch"); // No submapper
 
     // test large mapper and sub mapper parsing
-    let rom_path = get_file_path("34_test_2.nes");
+    let rom_path = get_file_path("nes_34_test_2.nes");
     let cartridge = emurom::nes::cartridge::Cartridge::load_rom_file(&rom_path);
 
     assert!(cartridge.is_ok());
@@ -69,7 +66,7 @@ fn test_nes2_rom_header() {
 
 #[test]
 pub fn test_cartridge_load_data() {
-    let rom_path = get_file_path("nestest.nes");
+    let rom_path = get_file_path("nes_nestest.nes");
     let mut file = std::fs::File::open(&rom_path).expect("Failed to open ROM file");
     let cartridge = emurom::nes::cartridge::Cartridge::load_rom_data(&mut file);
 
